@@ -1,0 +1,256 @@
+/* ===== Layout ===== */
+.page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* ===== Floating circles ===== */
+.floating-circles {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.08);
+  animation: float 30s infinite ease-in-out;
+}
+
+.circle:nth-child(1) {
+  width: 300px;
+  height: 300px;
+  top: -100px;
+  left: -100px;
+}
+.circle:nth-child(2) {
+  width: 400px;
+  height: 400px;
+  bottom: -150px;
+  right: -150px;
+}
+.circle:nth-child(3) {
+  width: 200px;
+  height: 200px;
+  top: 20%;
+  left: 20%;
+}
+.circle:nth-child(4) {
+  width: 250px;
+  height: 250px;
+  bottom: 10%;
+  left: 10%;
+}
+.circle:nth-child(5) {
+  width: 180px;
+  height: 180px;
+  top: 60%;
+  right: 10%;
+}
+.circle:nth-child(6) {
+  width: 350px;
+  height: 350px;
+  top: 40%;
+  left: 50%;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-30px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* ===== Glass Card ===== */
+.glass-card {
+  position: relative;
+  z-index: 5;
+  width: 380px;
+  padding: 40px;
+  border-radius: 18px;
+  backdrop-filter: blur(18px);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== Text ===== */
+.title {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 25px;
+}
+.title span {
+  color: #4f46e5;
+}
+
+/* ===== Inputs ===== */
+input {
+  width: 100%;
+  padding: 12px 14px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.8);
+  outline: none;
+  transition: 0.2s;
+}
+
+input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Password box */
+.password-box {
+  position: relative;
+}
+.password-box button {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* Password strength */
+.strength {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 20px;
+  background: #e5e7eb;
+}
+.bg-red {
+  background: #ef4444;
+}
+.bg-orange {
+  background: #f97316;
+}
+.bg-yellow {
+  background: #eab308;
+}
+.bg-green {
+  background: #22c55e;
+}
+
+/* ===== Submit Button ===== */
+.submit {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 999px;
+  color: white;
+  font-weight: 600;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  cursor: pointer;
+  transition: 0.25s;
+}
+.submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(79, 70, 229, 0.35);
+}
+
+/* ===== Messages ===== */
+.msg {
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  text-align: center;
+}
+.success {
+  background: #dcfce7;
+  color: #166534;
+}
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* ===== Divider ===== */
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0 15px;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+.divider::before {
+  margin-right: 10px;
+}
+.divider::after {
+  margin-left: 10px;
+}
+
+/* ===== Google Button ===== */
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: white;
+  color: #1f2937;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 15px;
+}
+.google-btn:hover {
+  background: #f8fafc;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+}
+.google-btn:active {
+  transform: translateY(0);
+}
+.google-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.google-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+
+/* ===== Login Link ===== */
+.login-link {
+  text-align: center;
+  margin-top: 15px;
+}
+.login-link a {
+  color: #4f46e5;
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-link a:hover {
+  text-decoration: underline;
+}

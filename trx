@@ -1,0 +1,1065 @@
+// // server.js
+// require('dotenv').config();
+
+// const express = require('express');
+// const mongoose = require('mongoose');
+// const cors = require('cors');
+// const path = require('path');
+// const fs = require('fs');
+// const bcrypt = require('bcrypt');
+// const session = require('express-session');
+// const MongoStore = require('connect-mongo');
+// const { v4: uuidv4 } = require('uuid');
+
+// const app = express();
+
+// /**
+//  * Development note:
+//  * If you deploy behind a proxy (Heroku, Cloud Run, etc.) and use secure cookies,
+//  * uncomment the trust proxy setting below in production.
+//  */
+// if (process.env.NODE_ENV === 'production') {
+//   app.set('trust proxy', 1);
+// }
+
+// // Basic request logging for env visibility (safe before DB)
+// app.use((req, res, next) => {
+//   console.log('=== ENV DEBUG ===');
+//   console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'Set' : 'Not set');
+//   console.log('SESSION_SECRET:', process.env.SESSION_SECRET ? 'Set' : 'Not set');
+//   console.log('NODE_ENV:', process.env.NODE_ENV || 'development');
+//   console.log('CLIENT_ORIGIN:', process.env.CLIENT_ORIGIN || 'http://localhost:5173');
+//   console.log('CLIENT_BUILD_PATH:', process.env.CLIENT_BUILD_PATH || path.join(__dirname, 'client', 'build'));
+//   console.log('==================');
+//   next();
+// });
+
+// // Basic middleware
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+
+// // CORS - allow credentials so cookies can be sent across origins
+// app.use(cors({
+//   origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+//   credentials: true
+// }));
+
+// // ---------- Mongoose schema/model (defined before connect, that's OK) ----------
+// const userSchema = new mongoose.Schema({
+//   user_id: {
+//     type: String,
+//     required: true,
+//     unique: true,
+//     default: () => uuidv4()
+//   },
+//   email: {
+//     type: String,
+//     required: true,
+//     unique: true,
+//     lowercase: true,
+//     trim: true
+//   },
+//   first_name: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   last_name: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   password: {
+//     type: String,
+//     required: true
+//   },
+//   created_at: { type: Date, default: Date.now },
+//   updated_at: { type: Date, default: Date.now }
+// });
+
+// userSchema.pre('save', function (next) {
+//   this.updated_at = Date.now();
+//   next();
+// });
+
+// const User = mongoose.model('User', userSchema);
+
+// // ---------- Expense Schema ----------
+// const expenseSchema = new mongoose.Schema({
+//   expense_id: {
+//     type: String,
+//     required: true,
+//     unique: true,
+//     default: () => uuidv4()
+//   },
+//   user_id: {
+//     type: String,
+//     required: true,
+//     ref: 'User'
+//   },
+//   title: {
+//     type: String,
+//     required: true,
+//     trim: true
+//   },
+//   amount: {
+//     type: Number,
+//     required: true,
+//     min: 0
+//   },
+//   category: {
+//     type: String,
+//     required: true,
+//     enum: ['Food & Dining', 'Transportation', 'Entertainment', 'Shopping', 'Utilities', 'Housing', 'Healthcare', 'Education', 'Travel', 'Personal Care', 'Savings', 'Income', 'Other'],
+//     default: 'Other'
+//   },
+//   date: {
+//     type: Date,
+//     required: true,
+//     default: Date.now
+//   },
+//   type: {
+//     type: String,
+//     required: true,
+//     enum: ['expense', 'income'],
+//     default: 'expense'
+//   },
+//   created_at: { type: Date, default: Date.now },
+//   updated_at: { type: Date, default: Date.now }
+// });
+
+// expenseSchema.pre('save', function (next) {
+//   this.updated_at = Date.now();
+//   next();
+// });
+
+// // Index for better query performance
+// expenseSchema.index({ user_id: 1, date: -1 });
+// expenseSchema.index({ user_id: 1, category: 1 });
+
+// const Expense = mongoose.model('Expense', expenseSchema);
+
+// // ---------- Helper: connect to MongoDB and return MongoClient ----------
+// async function connectDB() {
+//   const mongoURI = process.env.MONGODB_URI;
+//   if (!mongoURI) {
+//     throw new Error('MONGODB_URI is not defined in environment variables');
+//   }
+
+//   const forceIPv4 = process.env.MONGO_FORCE_IPV4 === 'true';
+
+//   const options = {
+//     useNewUrlParser: true,
+//     useUnifiedTopology: true,
+//     serverSelectionTimeoutMS: 30000,
+//     socketTimeoutMS: 45000,
+//     retryWrites: true,
+//     w: 'majority'
+//   };
+
+//   if (forceIPv4) {
+//     options.family = 4; // helpful on some Windows DNS/SRV setups
+//   }
+
+//   console.log('Attempting MongoDB connection...');
+//   await mongoose.connect(mongoURI, options);
+//   console.log('✅ Mongoose connected to MongoDB');
+
+//   // return underlying MongoClient to reuse in connect-mongo
+//   return mongoose.connection.getClient();
+// }
+
+// // ---------- Authentication middleware (uses req.session after sessions configured) ----------
+// const requireAuth = (req, res, next) => {
+//   console.log('Auth middleware - Session userId:', req.session?.userId);
+//   if (req.session && req.session.userId) {
+//     return next();
+//   }
+//   return res.status(401).json({ success: false, message: 'Not authenticated' });
+// };
+
+// // We'll attach session middleware AFTER DB connect so we can reuse the client.
+// // Define routes in a function so they can be registered after session middleware.
+// function registerRoutes() {
+//   // Debug / health endpoints
+//   app.get('/api/health', (req, res) => {
+//     res.json({
+//       status: 'OK',
+//       message: 'Server is running',
+//       timestamp: new Date().toISOString(),
+//       environment: process.env.NODE_ENV || 'development'
+//     });
+//   });
+
+//   app.get('/api/debug', (req, res) => {
+//     res.json({
+//       sessionId: req.sessionID,
+//       sessionData: req.session,
+//       cookiesReceived: req.headers.cookie || 'No cookies',
+//       requestHeaders: {
+//         origin: req.headers.origin,
+//         'user-agent': req.headers['user-agent'],
+//         cookie: req.headers.cookie
+//       }
+//     });
+//   });
+
+//   app.get('/api/test-cookie', (req, res) => {
+//     res.cookie('test_cookie', 'hello_world_' + Date.now(), {
+//       maxAge: 24 * 60 * 60 * 1000,
+//       httpOnly: false,
+//       secure: process.env.NODE_ENV === 'production',
+//       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+//     });
+
+//     req.session.testValue = 'session_test_' + Date.now();
+
+//     res.json({
+//       message: 'Test cookie and session set',
+//       sessionId: req.sessionID,
+//       testValue: req.session.testValue
+//     });
+//   });
+
+//   app.get('/api/debug-sessions', async (req, res) => {
+//     try {
+//       const sessions = await mongoose.connection.db.collection('sessions').find({}).toArray();
+//       res.json({
+//         totalSessions: sessions.length,
+//         sessions: sessions.map(s => ({
+//           id: s._id,
+//           expires: s.expires,
+//           session: (typeof s.session === 'string' ? JSON.parse(s.session) : s.session)
+//         }))
+//       });
+//     } catch (error) {
+//       res.status(500).json({ error: error.message });
+//     }
+//   });
+
+//   // Auth endpoints
+//   // NOTE: Signup returns only the user_id (per your requirement)
+//   app.post('/api/signup', async (req, res) => {
+//     try {
+//       const { email, first_name, last_name, password } = req.body;
+//       console.log('Signup attempt for:', email);
+
+//       if (!email || !first_name || !last_name || !password) {
+//         return res.status(400).json({ success: false, message: 'All fields are required' });
+//       }
+
+//       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//       if (!emailRegex.test(email)) {
+//         return res.status(400).json({ success: false, message: 'Invalid email format' });
+//       }
+
+//       if (password.length < 6) {
+//         return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+//       }
+
+//       const existingUser = await User.findOne({ email });
+//       if (existingUser) {
+//         return res.status(400).json({ success: false, message: 'User already exists' });
+//       }
+
+//       const newUser = new User({
+//         email,
+//         first_name,
+//         last_name,
+//         password: await bcrypt.hash(password, 10)
+//       });
+
+//       await newUser.save();
+
+//       // Auto-login: set session userId to the generated user_id
+//       req.session.userId = newUser.user_id;
+//       req.session.save(err => {
+//         if (err) {
+//           console.error('Session save error during signup:', err);
+//           return res.status(500).json({ success: false, message: 'Session error' });
+//         }
+//         console.log('User registered and session created:', newUser.email);
+//         // Return only the user_id (no other user data)
+//         return res.status(201).json({
+//           success: true,
+//           user_id: newUser.user_id
+//         });
+//       });
+
+//     } catch (err) {
+//       console.error('Signup error:', err);
+//       if (err.code === 11000) {
+//         return res.status(400).json({ success: false, message: 'Email already exists' });
+//       }
+//       return res.status(500).json({ success: false, message: 'Server error' });
+//     }
+//   });
+
+//   // Login returns only the user_id
+//   app.post('/api/login', async (req, res) => {
+//     try {
+//       const { email, password } = req.body;
+//       console.log('Login attempt for:', email);
+
+//       if (!email || !password) {
+//         return res.status(400).json({ success: false, message: 'Email and password are required' });
+//       }
+
+//       const user = await User.findOne({ email });
+//       if (!user) {
+//         console.log('Login failed: User not found');
+//         return res.status(401).json({ success: false, message: 'Invalid email or password' });
+//       }
+
+//       const isPasswordValid = await bcrypt.compare(password, user.password);
+//       if (!isPasswordValid) {
+//         console.log('Login failed: Invalid password');
+//         return res.status(401).json({ success: false, message: 'Invalid email or password' });
+//       }
+
+//       req.session.userId = user.user_id;
+//       req.session.save(err => {
+//         if (err) {
+//           console.error('Session save error during login:', err);
+//           return res.status(500).json({ success: false, message: 'Session error' });
+//         }
+
+//         console.log('Login successful, session created for:', user.email);
+//         // Return only the user_id
+//         return res.status(200).json({
+//           success: true,
+//           user_id: user.user_id
+//         });
+//       });
+
+//     } catch (err) {
+//       console.error('Login error:', err);
+//       return res.status(500).json({ success: false, message: 'Server error' });
+//     }
+//   });
+
+//   app.post('/api/logout', (req, res) => {
+//     console.log('Logout requested for session:', req.sessionID);
+//     req.session.destroy(err => {
+//       if (err) {
+//         console.error('Logout error:', err);
+//         return res.status(500).json({ success: false, message: 'Logout failed' });
+//       }
+//       // clear cookie name used by express-session (connect.sid by default)
+//       res.clearCookie('connect.sid');
+//       console.log('Logout successful');
+//       return res.status(200).json({ success: true, message: 'Logout successful' });
+//     });
+//   });
+
+//   // Returns only the user_id if authenticated
+//   app.get('/api/check-auth', (req, res) => {
+//     console.log('Check-auth called, session userId:', req.session?.userId);
+//     if (!req.session || !req.session.userId) {
+//       return res.status(401).json({ success: false, message: 'Not authenticated' });
+//     }
+
+//     // Return only user_id (do not leak other user fields)
+//     return res.json({
+//       success: true,
+//       user_id: req.session.userId
+//     });
+//   });
+
+//   // Minimal endpoint returning only ID for authenticated user (useful client-side)
+//   app.get('/api/me', requireAuth, (req, res) => {
+//     return res.json({ success: true, user_id: req.session.userId });
+//   });
+
+//   // Profile endpoint remains available if needed, but keep minimal or restrict usage
+// // Get full profile for authenticated user (returns name + email + id)
+// app.get('/api/profile', requireAuth, async (req, res) => {
+//   try {
+//     const user = await User.findOne({ user_id: req.session.userId }).select('user_id first_name last_name email created_at updated_at');
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: 'User not found' });
+//     }
+
+//     return res.json({
+//       success: true,
+//       user: {
+//         user_id: user.user_id,
+//         first_name: user.first_name,
+//         last_name: user.last_name,
+//         email: user.email,
+//         created_at: user.created_at,
+//         updated_at: user.updated_at
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Profile GET error:', err);
+//     return res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
+
+// // Update profile (first_name, last_name, email). Protected.
+// app.put('/api/profile', requireAuth, async (req, res) => {
+//   try {
+//     const { first_name, last_name, email } = req.body;
+
+//     // Validate input lightly
+//     if (!first_name || !last_name || !email) {
+//       return res.status(400).json({ success: false, message: 'first_name, last_name and email are required' });
+//     }
+
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ success: false, message: 'Invalid email format' });
+//     }
+
+//     // Ensure email is not used by another account
+//     const existing = await User.findOne({ email: email.toLowerCase().trim() });
+//     if (existing && existing.user_id !== req.session.userId) {
+//       return res.status(409).json({ success: false, message: 'Email already in use' });
+//     }
+
+//     // Update the user document
+//     const updated = await User.findOneAndUpdate(
+//       { user_id: req.session.userId },
+//       {
+//         first_name: first_name.trim(),
+//         last_name: last_name.trim(),
+//         email: email.toLowerCase().trim(),
+//         updated_at: new Date()
+//       },
+//       { new: true, runValidators: true, context: 'query' }
+//     ).select('user_id first_name last_name email created_at updated_at');
+
+//     if (!updated) {
+//       return res.status(404).json({ success: false, message: 'User not found' });
+//     }
+
+//     // Return minimal user object
+//     return res.json({
+//       success: true,
+//       message: 'Profile updated',
+//       user: {
+//         user_id: updated.user_id,
+//         first_name: updated.first_name,
+//         last_name: updated.last_name,
+//         email: updated.email,
+//         created_at: updated.created_at,
+//         updated_at: updated.updated_at
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Profile PUT error:', err);
+//     // handle duplicate key at DB level just in case
+//     if (err.code === 11000) {
+//       return res.status(409).json({ success: false, message: 'Email already exists' });
+//     }
+//     return res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
+
+
+//   // ========== EXPENSE MANAGEMENT ENDPOINTS ==========
+//   // (unchanged behaviour — protected by requireAuth)
+
+//   // Get all expenses for the authenticated user
+//   app.get('/api/expenses', requireAuth, async (req, res) => {
+//     try {
+//       const { page = 1, limit = 50, category, type, startDate, endDate } = req.query;
+      
+//       const filter = { user_id: req.session.userId };
+      
+//       // Apply filters if provided
+//       if (category && category !== 'all') {
+//         filter.category = category;
+//       }
+//       if (type && type !== 'all') {
+//         filter.type = type;
+//       }
+//       if (startDate || endDate) {
+//         filter.date = {};
+//         if (startDate) filter.date.$gte = new Date(startDate);
+//         if (endDate) filter.date.$lte = new Date(endDate);
+//       }
+
+//       const expenses = await Expense.find(filter)
+//         .sort({ date: -1, created_at: -1 })
+//         .limit(limit * 1)
+//         .skip((page - 1) * limit)
+//         .select('-__v');
+
+//       const total = await Expense.countDocuments(filter);
+
+//       res.json({
+//         success: true,
+//         expenses,
+//         totalPages: Math.ceil(total / limit),
+//         currentPage: page,
+//         total
+//       });
+//     } catch (err) {
+//       console.error('Get expenses error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to fetch expenses' });
+//     }
+//   });
+
+//   // Get expense by ID
+//   app.get('/api/expenses/:expenseId', requireAuth, async (req, res) => {
+//     try {
+//       const expense = await Expense.findOne({ 
+//         expense_id: req.params.expenseId, 
+//         user_id: req.session.userId 
+//       }).select('-__v');
+
+//       if (!expense) {
+//         return res.status(404).json({ success: false, message: 'Expense not found' });
+//       }
+
+//       res.json({ success: true, expense });
+//     } catch (err) {
+//       console.error('Get expense error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to fetch expense' });
+//     }
+//   });
+
+//   // Create new expense
+//   app.post('/api/expenses', requireAuth, async (req, res) => {
+//     try {
+//       const { title, amount, category, date, type } = req.body;
+
+//       // Validation
+//       if (!title || !amount || !category || !date) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Title, amount, category, and date are required' 
+//         });
+//       }
+
+//       if (typeof amount !== 'number' || amount < 0) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Amount must be a positive number' 
+//         });
+//       }
+
+//       const validCategories = ['Food & Dining', 'Transportation', 'Entertainment', 'Shopping', 'Utilities', 'Housing', 'Healthcare', 'Education', 'Travel', 'Personal Care', 'Savings', 'Income', 'Other'];
+//       if (!validCategories.includes(category)) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Invalid category' 
+//         });
+//       }
+
+//       const validTypes = ['expense', 'income'];
+//       const expenseType = type || (category === 'Income' ? 'income' : 'expense');
+//       if (!validTypes.includes(expenseType)) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Invalid type' 
+//         });
+//       }
+
+//       const newExpense = new Expense({
+//         user_id: req.session.userId,
+//         title,
+//         amount,
+//         category,
+//         date: new Date(date),
+//         type: expenseType
+//       });
+
+//       await newExpense.save();
+
+//       console.log('Expense created for user:', req.session.userId);
+//       res.status(201).json({
+//         success: true,
+//         message: 'Expense created successfully',
+//         expense: newExpense
+//       });
+//     } catch (err) {
+//       console.error('Create expense error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to create expense' });
+//     }
+//   });
+
+//   // Update expense
+//   app.put('/api/expenses/:expenseId', requireAuth, async (req, res) => {
+//     try {
+//       const { title, amount, category, date, type } = req.body;
+
+//       // Validation
+//       if (!title || !amount || !category || !date) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Title, amount, category, and date are required' 
+//         });
+//       }
+
+//       if (typeof amount !== 'number' || amount < 0) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Amount must be a positive number' 
+//         });
+//       }
+
+//       const validCategories = ['Food & Dining', 'Transportation', 'Entertainment', 'Shopping', 'Utilities', 'Housing', 'Healthcare', 'Education', 'Travel', 'Personal Care', 'Savings', 'Income', 'Other'];
+//       if (!validCategories.includes(category)) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Invalid category' 
+//         });
+//       }
+
+//       const validTypes = ['expense', 'income'];
+//       const expenseType = type || (category === 'Income' ? 'income' : 'expense');
+//       if (!validTypes.includes(expenseType)) {
+//         return res.status(400).json({ 
+//           success: false, 
+//           message: 'Invalid type' 
+//         });
+//       }
+
+//       const updatedExpense = await Expense.findOneAndUpdate(
+//         { 
+//           expense_id: req.params.expenseId, 
+//           user_id: req.session.userId 
+//         },
+//         {
+//           title,
+//           amount,
+//           category,
+//           date: new Date(date),
+//           type: expenseType,
+//           updated_at: new Date()
+//         },
+//         { new: true, runValidators: true }
+//       ).select('-__v');
+
+//       if (!updatedExpense) {
+//         return res.status(404).json({ success: false, message: 'Expense not found' });
+//       }
+
+//       console.log('Expense updated for user:', req.session.userId);
+//       res.json({
+//         success: true,
+//         message: 'Expense updated successfully',
+//         expense: updatedExpense
+//       });
+//     } catch (err) {
+//       console.error('Update expense error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to update expense' });
+//     }
+//   });
+
+//   // Delete expense
+//   app.delete('/api/expenses/:expenseId', requireAuth, async (req, res) => {
+//     try {
+//       const deletedExpense = await Expense.findOneAndDelete({ 
+//         expense_id: req.params.expenseId, 
+//         user_id: req.session.userId 
+//       });
+
+//       if (!deletedExpense) {
+//         return res.status(404).json({ success: false, message: 'Expense not found' });
+//       }
+
+//       console.log('Expense deleted for user:', req.session.userId);
+//       res.json({
+//         success: true,
+//         message: 'Expense deleted successfully'
+//       });
+//     } catch (err) {
+//       console.error('Delete expense error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to delete expense' });
+//     }
+//   });
+
+//   // Get expense statistics
+//   app.get('/api/expenses-stats', requireAuth, async (req, res) => {
+//     try {
+//       const { startDate, endDate } = req.query;
+      
+//       const matchStage = { user_id: req.session.userId };
+      
+//       if (startDate || endDate) {
+//         matchStage.date = {};
+//         if (startDate) matchStage.date.$gte = new Date(startDate);
+//         if (endDate) matchStage.date.$lte = new Date(endDate);
+//       }
+
+//       const stats = await Expense.aggregate([
+//         { $match: matchStage },
+//         {
+//           $group: {
+//             _id: null,
+//             totalIncome: {
+//               $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] }
+//             },
+//             totalExpenses: {
+//               $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] }
+//             },
+//             categoryBreakdown: {
+//               $push: {
+//                 category: '$category',
+//                 amount: '$amount',
+//                 type: '$type'
+//               }
+//             }
+//           }
+//         }
+//       ]);
+
+//       const categoryStats = await Expense.aggregate([
+//         { $match: { ...matchStage, type: 'expense' } },
+//         {
+//           $group: {
+//             _id: '$category',
+//             total: { $sum: '$amount' }
+//           }
+//         },
+//         { $sort: { total: -1 } }
+//       ]);
+
+//       const result = stats[0] || {
+//         totalIncome: 0,
+//         totalExpenses: 0,
+//         categoryBreakdown: []
+//       };
+
+//       res.json({
+//         success: true,
+//         stats: {
+//           totalIncome: result.totalIncome,
+//           totalExpenses: result.totalExpenses,
+//           netSavings: result.totalIncome - result.totalExpenses,
+//           categoryBreakdown: categoryStats
+//         }
+//       });
+//     } catch (err) {
+//       console.error('Get stats error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to fetch statistics' });
+//     }
+//   });
+
+//   // Update profile (PUT /api/profile)
+// // Accepts: { first_name?, last_name?, email?, password? }
+// // Requires authentication via requireAuth
+// app.get('/api/profile', requireAuth, async (req, res) => {
+//   try {
+//     const allowedFields = ['first_name', 'last_name', 'email', 'password'];
+//     const updates = {};
+//     const { first_name, last_name, email, password } = req.body;
+
+//     // No-op if nothing provided
+//     if (!first_name && !last_name && !email && !password) {
+//       return res.status(400).json({ success: false, message: 'No fields provided to update' });
+//     }
+
+//     // Validate and sanitize fields
+//     if (first_name) {
+//       if (typeof first_name !== 'string' || !first_name.trim()) {
+//         return res.status(400).json({ success: false, message: 'Invalid first_name' });
+//       }
+//       updates.first_name = first_name.trim();
+//     }
+
+//     if (last_name) {
+//       if (typeof last_name !== 'string' || !last_name.trim()) {
+//         return res.status(400).json({ success: false, message: 'Invalid last_name' });
+//       }
+//       updates.last_name = last_name.trim();
+//     }
+
+//     if (email) {
+//       if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+//         return res.status(400).json({ success: false, message: 'Invalid email format' });
+//       }
+//       // ensure uniqueness: exclude current user
+//       const existing = await User.findOne({ email: email.toLowerCase().trim() });
+//       if (existing && existing.user_id !== req.session.userId) {
+//         return res.status(400).json({ success: false, message: 'Email already in use' });
+//       }
+//       updates.email = email.toLowerCase().trim();
+//     }
+
+//     if (password) {
+//       if (typeof password !== 'string' || password.length < 6) {
+//         return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+//       }
+//       // hash password before saving
+//       const hashed = await bcrypt.hash(password, 10);
+//       updates.password = hashed;
+//     }
+
+//     // Always update updated_at
+//     updates.updated_at = new Date();
+
+//     const updated = await User.findOneAndUpdate(
+//       { user_id: req.session.userId },
+//       { $set: updates },
+//       { new: true, runValidators: true }
+//     ).select('-password -__v');
+
+//     if (!updated) {
+//       return res.status(404).json({ success: false, message: 'User not found' });
+//     }
+
+//     // Return only non-sensitive minimal info (user_id and updated_at)
+//     return res.json({
+//       success: true,
+//       user: {
+//         user_id: updated.user_id,
+//         updated_at: updated.updated_at
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Profile update error:', err);
+//     // Handle duplicate key error defensively
+//     if (err.code === 11000) {
+//       return res.status(400).json({ success: false, message: 'Email already exists' });
+//     }
+//     return res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
+
+//   // Get expenses by time range for charts
+//   app.get('/api/expenses-chart', requireAuth, async (req, res) => {
+//     try {
+//       const { range = 'month' } = req.query;
+//       const now = new Date();
+//       let startDate, groupBy;
+
+//       switch (range) {
+//         case 'month':
+//           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+//           groupBy = { day: { $dayOfMonth: '$date' } };
+//           break;
+//         case '3months':
+//           startDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+//           groupBy = { 
+//             month: { $month: '$date' },
+//             year: { $year: '$date' }
+//           };
+//           break;
+//         case 'year':
+//           startDate = new Date(now.getFullYear(), 0, 1);
+//           groupBy = { month: { $month: '$date' } };
+//           break;
+//         default:
+//           startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+//           groupBy = { day: { $dayOfMonth: '$date' } };
+//       }
+
+//       const chartData = await Expense.aggregate([
+//         {
+//           $match: {
+//             user_id: req.session.userId,
+//             date: { $gte: startDate }
+//           }
+//         },
+//         {
+//           $group: {
+//             _id: groupBy,
+//             income: {
+//               $sum: { $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0] }
+//             },
+//             expenses: {
+//               $sum: { $cond: [{ $eq: ['$type', 'expense'] }, '$amount', 0] }
+//             }
+//           }
+//         },
+//         { $sort: { '_id': 1 } }
+//       ]);
+
+//       res.json({
+//         success: true,
+//         chartData,
+//         range
+//       });
+//     } catch (err) {
+//       console.error('Get chart data error:', err);
+//       res.status(500).json({ success: false, message: 'Failed to fetch chart data' });
+//     }
+//   });
+
+//   app.delete('/api/clear-sessions', async (req, res) => {
+//     try {
+//       await mongoose.connection.db.collection('sessions').deleteMany({});
+//       return res.json({ message: 'All sessions cleared' });
+//     } catch (error) {
+//       return res.status(500).json({ error: error.message });
+//     }
+//   });
+
+//   // 404 for /api/*
+//   app.use((req, res, next) => {
+//     if (req.path.startsWith('/api/')) {
+//       return res.status(404).json({ success: false, message: 'API endpoint not found' });
+//     }
+//     next();
+//   });
+
+//   // Error handler
+//   app.use((err, req, res, next) => {
+//     console.error('Unhandled error:', err);
+//     return res.status(500).json({ success: false, message: 'Internal server error' });
+//   });
+// }
+
+// // ---------- Start server: connect DB, setup session store with client, register routes ----------
+// (async function startServer() {
+//   try {
+//     const mongoClient = await connectDB();
+
+//     // Configure session middleware using existing client (avoids a second connection)
+//     app.use(session({
+//       secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+//       resave: false,
+//       saveUninitialized: false,
+//       store: MongoStore.create({
+//         client: mongoClient,
+//         collectionName: process.env.SESSION_COLLECTION || 'sessions',
+//         ttl: 30 * 24 * 60 * 60
+//       }),
+//       cookie: {
+//         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+//         httpOnly: true,
+//         secure: process.env.NODE_ENV === 'production',
+//         sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+//       }
+//     }));
+
+//     // Request debug middleware that uses session (safe now)
+//     app.use((req, res, next) => {
+//       console.log('=== REQUEST DEBUG ===');
+//       console.log('Method:', req.method);
+//       console.log('URL:', req.url);
+//       console.log('Origin:', req.headers.origin);
+//       console.log('Cookies:', req.headers.cookie || 'No cookies');
+//       console.log('Session ID:', req.sessionID);
+//       console.log('Session userId:', req.session?.userId || 'Not set');
+//       console.log('=====================');
+//       next();
+//     });
+
+//     // now register all API routes
+//     registerRoutes();
+
+//     // ---------- Serve client build (if present) and protect /expenses routes ----------
+//     const clientBuildPath = process.env.CLIENT_BUILD_PATH || path.join(__dirname, 'client', 'build');
+
+//     if (fs.existsSync(clientBuildPath)) {
+//       // Serve static assets
+//       app.use(express.static(clientBuildPath));
+
+//       // Protected SPA route(s) — only serve index.html if authenticated
+//       app.get(['/expenses', '/expenses/*'], (req, res) => {
+//         if (req.session && req.session.userId) {
+//           return res.sendFile(path.join(clientBuildPath, 'index.html'));
+//         }
+//         // Not authenticated: redirect to client login page (client origin + /login)
+//         const loginUrl = (process.env.CLIENT_ORIGIN || 'http://localhost:5173') + '/login';
+//         return res.redirect(loginUrl);
+//       });
+
+//       // Get budget data endpoint
+// app.get('/api/budget', requireAuth, async (req, res) => {
+//   try {
+//     // First check localStorage key for this user
+//     const userBudgetKey = `expenseai:budget:${req.session.userId}`;
+//     const budgetRaw = localStorage.getItem(userBudgetKey);
+    
+//     if (budgetRaw) {
+//       const budget = JSON.parse(budgetRaw);
+//       return res.json({
+//         success: true,
+//         budget: {
+//           monthlyBudget: budget.monthlyBudget || 0,
+//           savingsGoal: budget.savingsGoal || 0,
+//           currency: budget.currency || 'INR'
+//         }
+//       });
+//     }
+    
+//     // Fallback to general budget
+//     const generalBudgetRaw = localStorage.getItem('expenseai:budget');
+//     if (generalBudgetRaw) {
+//       const budget = JSON.parse(generalBudgetRaw);
+//       return res.json({
+//         success: true,
+//         budget: {
+//           monthlyBudget: budget.monthlyBudget || 0,
+//           savingsGoal: budget.savingsGoal || 0,
+//           currency: budget.currency || 'INR'
+//         }
+//       });
+//     }
+    
+//     // Return default if no budget found
+//     return res.json({
+//       success: true,
+//       budget: {
+//         monthlyBudget: 0,
+//         savingsGoal: 0,
+//         currency: 'INR'
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Budget GET error:', err);
+//     return res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
+
+//       // For any other non-API route, serve index.html so client-side router works.
+//       app.get('*', (req, res, next) => {
+//         if (req.path.startsWith('/api/')) return next();
+//         return res.sendFile(path.join(clientBuildPath, 'index.html'));
+//       });
+
+//       console.log('Static client build serving enabled at', clientBuildPath);
+//     } else {
+//       console.log('Client build not found at', clientBuildPath, '- skipping static serving.');
+//     }
+
+//     const PORT = process.env.PORT || 5000;
+//     const server = app.listen(PORT, () => {
+//       console.log(`🚀 Server is running on port ${PORT}`);
+//       console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
+//       console.log(`🌐 CORS enabled for: ${process.env.CLIENT_ORIGIN || 'http://localhost:5173'}`);
+//       console.log(`🗄️  Database: ${process.env.MONGODB_URI ? 'Set' : 'Not set'}`);
+//       console.log(`🔐 Session secret: ${process.env.SESSION_SECRET ? 'Set' : 'Using fallback'}`);
+//       console.log(`💰 Expense endpoints: Enabled`);
+//     });
+
+//     // graceful shutdown
+//     const shutdown = async () => {
+//       console.log('Shutting down...');
+//       server.close(async () => {
+//         try {
+//           await mongoose.disconnect();
+//           console.log('Mongoose disconnected.');
+//           process.exit(0);
+//         } catch (err) {
+//           console.error('Error during shutdown:', err);
+//           process.exit(1);
+//         }
+//       });
+//     };
+
+//     process.on('SIGINT', shutdown);
+//     process.on('SIGTERM', shutdown);
+
+//   } catch (err) {
+//     console.error('❌ FAILED TO START SERVER:', err);
+//     console.log('Please check:');
+//     console.log('  - MONGODB_URI is correct');
+//     console.log('  - Network access (Atlas IP whitelist or local mongod running)');
+//     console.log('  - NODE version (use current LTS)');
+//     process.exit(1);
+//   }
+// })();
+
+
+
+
+
+
