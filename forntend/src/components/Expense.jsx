@@ -424,28 +424,14 @@ export default function Expense({ user, onLogout }) {
       let toIndex = () => -1;
 
       if (timeRange === 'this_month') {
-        if (isTestUser) {
-          const days = new Date(cy, cm + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else if (timeRange === 'prev_year_same_month') {
         const py = cy - 1;
-        if (isTestUser) {
-          const days = new Date(py, cm + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else if (timeRange === 'past_3_months') {
         for (let i = 2; i >= 0; i--) {
           const d = new Date(cy, cm - i, 1);
@@ -461,16 +447,9 @@ export default function Expense({ user, onLogout }) {
           return 2 - monthsAgo;
         };
       } else if (timeRange === 'custom_month') {
-        if (isTestUser) {
-          const days = new Date(selectedChartYear, selectedChartMonthIndex + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else {
         const monthSet = new Set();
         expenses.forEach((e) => {
@@ -534,28 +513,14 @@ export default function Expense({ user, onLogout }) {
       let labels = [], dateFilter;
       let toIndex = () => -1;
       if (timeRange === 'this_month') {
-        if (isTestUser) {
-          const days = new Date(cy, cm + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === cy && dp.m === cm;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else if (timeRange === 'prev_year_same_month') {
         const py = cy - 1;
-        if (isTestUser) {
-          const days = new Date(py, cm + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === py && dp.m === cm;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else if (timeRange === 'past_3_months') {
         for (let i = 2; i >= 0; i--) {
           const d = new Date(cy, cm - i, 1);
@@ -568,16 +533,9 @@ export default function Expense({ user, onLogout }) {
         };
         toIndex = (dp) => { const ma = (cy - dp.y) * 12 + (cm - dp.m); return 2 - ma; };
       } else if (timeRange === 'custom_month') {
-        if (isTestUser) {
-          const days = new Date(selectedChartYear, selectedChartMonthIndex + 1, 0).getDate();
-          labels = Array.from({ length: days }, (_, i) => `${i + 1}`);
-          dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
-          toIndex = (dp) => dp.d - 1;
-        } else {
-          labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
-          dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
-          toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
-        }
+        labels = ['W1', 'W2', 'W3', 'W4', 'W5'];
+        dateFilter = (dp) => dp && dp.y === selectedChartYear && dp.m === selectedChartMonthIndex;
+        toIndex = (dp) => Math.min(4, Math.floor((dp.d - 1) / 7));
       } else {
         const monthSet = new Set();
         expenses.forEach((e) => {
@@ -606,7 +564,7 @@ export default function Expense({ user, onLogout }) {
     setOverviewData(buildOverview());
     setCategoryData(buildCategory());
     setTrendData(buildTrend());
-  }, [expenses, timeRange, isTestUser, selectedChartMonth]);
+  }, [expenses, timeRange, selectedChartMonth]);
 
   const now=new Date(), cm=now.getMonth(), cy=now.getFullYear();
   const totalExpenses = expenses.filter(e=>e.type==='expense').reduce((s,e)=>s+san(e.amount),0);
@@ -663,11 +621,11 @@ export default function Expense({ user, onLogout }) {
 
     const periodLabel =
       timeRange === 'this_month' || timeRange === 'prev_year_same_month'
-        ? (isTestUser ? `Day ${label}` : `Week ${String(label).replace('W', '')}`)
+        ? `Week ${String(label).replace('W', '')}`
         : String(label);
 
     return { label: periodLabel, total, transactionCount };
-  }, [selectedOverviewIdx, overviewData, timeRange, isTestUser]);
+  }, [selectedOverviewIdx, overviewData, timeRange]);
   const summaryExpenseTotal = selectedOverviewStats?.total ?? rangedExpenseTotal;
   const summaryTransactionCount = selectedOverviewStats?.transactionCount ?? rangedTransactionCount;
   const summaryLabel = selectedOverviewStats?.label ?? txRangeLabel;
@@ -889,7 +847,7 @@ export default function Expense({ user, onLogout }) {
                       x: e.clientX,
                       y: e.clientY,
                       title: (timeRange === 'this_month' || timeRange === 'prev_year_same_month')
-                        ? (isTestUser ? `Day ${label}` : `Week ${label.replace('W','')}`)
+                        ? `Week ${label.replace('W','')}`
                         : label,
                       items,
                       total: fmtD(dayTotal),

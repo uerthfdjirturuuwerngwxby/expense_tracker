@@ -15,9 +15,11 @@ export default function OAuthCallback() {
     const handleOAuth = async () => {
       try {
         const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
         const code = params.get("code");
-        const error = params.get("error");
-        const errorDescription = params.get("error_description");
+        const error = params.get("error") || hashParams.get("error");
+        const errorDescription = params.get("error_description") || hashParams.get("error_description");
+        let session = null;
 
         if (error) {
           navigate(`/login?error=${encodeURIComponent(errorDescription || error)}`, { replace: true });
@@ -25,13 +27,15 @@ export default function OAuthCallback() {
         }
 
         if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+          navigate("/login?error=oauth_failed", { replace: true });
+          return;
         }
 
         const { data, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) throw sessionError;
-        if (!data?.session?.access_token) {
+        session = data?.session ?? null;
+
+        if (!session?.access_token) {
           navigate("/login?error=oauth_failed", { replace: true });
           return;
         }
@@ -40,7 +44,7 @@ export default function OAuthCallback() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ access_token: data.session.access_token }),
+          body: JSON.stringify({ access_token: session.access_token }),
         });
 
         const json = await response.json().catch(() => ({}));
