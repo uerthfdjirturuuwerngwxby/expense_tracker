@@ -33,10 +33,24 @@ const JWT_SECRET    = process.env.JWT_SECRET;
 const JWT_EXPIRES   = "7d";
 const groq          = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const isProduction  = process.env.NODE_ENV === "production";
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN,
+  "http://localhost:5173",
+  "https://expense-tracker-sable-mu-19.vercel.app",
+].filter(Boolean);
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+}));
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.get("/", (_req, res) => {
