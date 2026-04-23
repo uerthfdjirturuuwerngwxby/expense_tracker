@@ -32,6 +32,7 @@ const supabaseAnon  = createClient(process.env.SUPABASE_URL, process.env.SUPABAS
 const JWT_SECRET    = process.env.JWT_SECRET;
 const JWT_EXPIRES   = "7d";
 const groq          = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const isProduction  = process.env.NODE_ENV === "production";
 
 app.use(express.json());
 app.use(cookieParser());
@@ -40,9 +41,17 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 const COOKIE_NAME    = "auth_token";
 const COOKIE_VISIBLE = "auth_token_info";
-const COOKIE_BASE = { secure:false, sameSite:process.env.NODE_ENV==="production"?"strict":"lax", maxAge:7*24*60*60*1000, path:"/" };
+const COOKIE_BASE = {
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
 const sendAuthCookie = (res,token) => { res.cookie(COOKIE_NAME,token,{...COOKIE_BASE,httpOnly:true}); res.cookie(COOKIE_VISIBLE,token,{...COOKIE_BASE,httpOnly:false}); };
-const clearAuthCookie = (res) => { res.clearCookie(COOKIE_NAME,{path:"/"}); res.clearCookie(COOKIE_VISIBLE,{path:"/"}); };
+const clearAuthCookie = (res) => {
+  res.clearCookie(COOKIE_NAME, COOKIE_BASE);
+  res.clearCookie(COOKIE_VISIBLE, COOKIE_BASE);
+};
 const signToken = (p) => jwt.sign(p, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 const verifyToken = (t) => { try { return jwt.verify(t,JWT_SECRET); } catch { return null; } };
 
@@ -61,6 +70,25 @@ async function upsertProfile({ id,email,first_name,last_name,full_name,avatar_ur
     { onConflict:"id", ignoreDuplicates:false }).select().single();
   if (error) throw new Error(error.message);
   return data;
+}
+
+async function getProfileById(userId) {
+  const extended = await supabaseAdmin
+    .from("profiles")
+    .select("id,email,full_name,avatar_url,provider,first_name,last_name,area,location")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!extended.error && extended.data) return extended;
+
+  const fallback = await supabaseAdmin
+    .from("profiles")
+    .select("id,email,full_name,avatar_url,provider,first_name,last_name")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (fallback.data && !("area" in fallback.data)) fallback.data.area = null;
+  if (fallback.data && !("location" in fallback.data)) fallback.data.location = null;
+  return fallback;
 }
 
 // Maps DB row to frontend object (expense_date → date, snake_case → camelCase)
@@ -690,22 +718,87 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.get("/api/me", requireAuth, async (req, res) => {
-  const { data:profile, error } = await supabaseAdmin.from("profiles").select("id,email,full_name,avatar_url,provider,first_name,last_name").eq("id",req.user.id).single();
+  const { data:profile, error } = await getProfileById(req.user.id);
   if (error||!profile) { clearAuthCookie(res); return res.status(401).json({ message:"User not found." }); }
   return res.json({ user:profile });
 });
 
-// PUT /api/profile — update first_name, last_name, full_name
+app.get("/api/expenses/export.csv", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("expenses")
+      .select("title,amount,category,type,expense_date,created_at")
+      .eq("user_id", req.user.id)
+      .order("expense_date", { ascending: false })
+      .order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+
+    const rows = [["Title", "Amount", "Category", "Type", "Date", "Created At"]];
+    for (const row of data || []) {
+      rows.push([
+        row.title || "",
+        String(sanitizeNum(row.amount)),
+        row.category || "",
+        row.type || "",
+        row.expense_date || "",
+        row.created_at || "",
+      ]);
+    }
+
+    const csv = rows
+      .map((cols) => cols.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="expenseai-expenses.csv"');
+    return res.status(200).send(csv);
+  } catch (err) {
+    console.error("GET /api/expenses/export.csv:", err);
+    return res.status(500).json({ message: "Export failed." });
+  }
+});
+
+app.delete("/api/account", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { error: expenseError } = await supabaseAdmin.from("expenses").delete().eq("user_id", userId);
+    if (expenseError) return res.status(500).json({ message: expenseError.message });
+
+    const { error: profileError } = await supabaseAdmin.from("profiles").delete().eq("id", userId);
+    if (profileError) return res.status(500).json({ message: profileError.message });
+
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (authError) return res.status(500).json({ message: authError.message });
+
+    clearAuthCookie(res);
+    return res.json({ message: "Account deleted." });
+  } catch (err) {
+    console.error("DELETE /api/account:", err);
+    return res.status(500).json({ message: "Failed to delete account." });
+  }
+});
+
+// PUT /api/profile — update first_name, last_name, full_name, area, location
 app.put("/api/profile", requireAuth, async (req, res) => {
   try {
-    const { first_name, last_name } = req.body;
-    if (!first_name && !last_name) return res.status(400).json({ message:"first_name or last_name required." });
+    const { first_name, last_name, area, location } = req.body;
+    if (!first_name && !last_name && !area && !location) {
+      return res.status(400).json({ message:"first_name, last_name, area, or location required." });
+    }
     const full_name = [first_name, last_name].filter(Boolean).join(" ").trim();
+    const updates = {
+      updated_at: new Date().toISOString(),
+    };
+    if (first_name !== undefined) updates.first_name = first_name || null;
+    if (last_name !== undefined) updates.last_name = last_name || null;
+    if (first_name !== undefined || last_name !== undefined) updates.full_name = full_name || null;
+    if (area !== undefined) updates.area = area || null;
+    if (location !== undefined) updates.location = location || null;
     const { data, error } = await supabaseAdmin
       .from("profiles")
-      .update({ first_name: first_name||null, last_name: last_name||null, full_name })
+      .update(updates)
       .eq("id", req.user.id)
-      .select("id,email,full_name,avatar_url,provider,first_name,last_name")
+      .select("id,email,full_name,avatar_url,provider,first_name,last_name,area,location")
       .single();
     if (error) return res.status(500).json({ message: error.message });
     if (!data)  return res.status(404).json({ message:"Profile not found." });

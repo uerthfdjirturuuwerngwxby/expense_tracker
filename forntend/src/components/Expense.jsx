@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { API_BASE } from './apiBase';
 
 const NAV_LINKS = [
   { label: 'Home',     to: '/'         },
@@ -122,7 +123,7 @@ const parseDateParts = (dateStr) => {
 };
 const monthInputValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
-const API = 'http://localhost:4000';
+const API = API_BASE;
 const TEST_EMAIL = 'samalanithin18@gmail.com';
 const TEST_DAILY_EXP_KEY = 'expenseai:test:dailyExpenses:v1';
 

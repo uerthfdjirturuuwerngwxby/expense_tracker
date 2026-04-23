@@ -31,6 +31,11 @@ function hasVisibleSessionCookie() {
   return document.cookie.split(";").some((part) => part.trim().startsWith("auth_token_info="));
 }
 
+function clearVisibleSessionCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = "auth_token_info=; Max-Age=0; path=/";
+}
+
 async function syncUserFromServer() {
   const data = await apiFetch("/api/me");
   broadcastAuthState({ user: data.user, loading: false });
@@ -64,6 +69,7 @@ export function useAuth() {
       try {
         await syncUserFromServer();
       } catch {
+        clearVisibleSessionCookie();
         broadcastAuthState({ user: null, loading: false });
       }
     };
@@ -132,6 +138,7 @@ export function useAuth() {
     try {
       return await syncUserFromServer();
     } catch {
+      clearVisibleSessionCookie();
       broadcastAuthState({ user: null, loading: false });
       return null;
     }
@@ -154,6 +161,7 @@ export function useAuth() {
       localStorage.removeItem("expenseai:budget");
     }
     await apiFetch("/api/logout", { method: "POST" });
+    clearVisibleSessionCookie();
     broadcastAuthState({ user: null, loading: false });
   }, [user]);
 
