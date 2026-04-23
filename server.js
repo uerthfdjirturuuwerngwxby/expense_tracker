@@ -32,6 +32,7 @@ const supabaseAnon  = createClient(process.env.SUPABASE_URL, process.env.SUPABAS
 const JWT_SECRET    = process.env.JWT_SECRET;
 const JWT_EXPIRES   = "7d";
 const groq          = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const isProduction  = process.env.NODE_ENV === "production";
 
 app.use(express.json());
 app.use(cookieParser());
@@ -48,9 +49,17 @@ app.get("/health", (_req, res) => {
 
 const COOKIE_NAME    = "auth_token";
 const COOKIE_VISIBLE = "auth_token_info";
-const COOKIE_BASE = { secure:false, sameSite:process.env.NODE_ENV==="production"?"strict":"lax", maxAge:7*24*60*60*1000, path:"/" };
+const COOKIE_BASE = {
+  secure: isProduction,
+  sameSite: isProduction ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
 const sendAuthCookie = (res,token) => { res.cookie(COOKIE_NAME,token,{...COOKIE_BASE,httpOnly:true}); res.cookie(COOKIE_VISIBLE,token,{...COOKIE_BASE,httpOnly:false}); };
-const clearAuthCookie = (res) => { res.clearCookie(COOKIE_NAME,{path:"/"}); res.clearCookie(COOKIE_VISIBLE,{path:"/"}); };
+const clearAuthCookie = (res) => {
+  res.clearCookie(COOKIE_NAME, COOKIE_BASE);
+  res.clearCookie(COOKIE_VISIBLE, COOKIE_BASE);
+};
 const signToken = (p) => jwt.sign(p, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 const verifyToken = (t) => { try { return jwt.verify(t,JWT_SECRET); } catch { return null; } };
 
