@@ -21,6 +21,20 @@ let sharedAuthState = {
   loading: true,
 };
 
+function getOAuthRedirectUrl() {
+  const configuredUrl =
+    import.meta.env.VITE_AUTH_CALLBACK_URL ||
+    import.meta.env.VITE_AUTH0_CALLBACK_URL ||
+    "";
+
+  if (configuredUrl) {
+    const trimmed = configuredUrl.trim().replace(/\/$/, "");
+    return trimmed.endsWith("/auth/callback") ? trimmed : `${trimmed}/auth/callback`;
+  }
+
+  return `${window.location.origin}/auth/callback`;
+}
+
 function broadcastAuthState(next) {
   sharedAuthState = { ...sharedAuthState, ...next };
   for (const listener of listeners) listener(sharedAuthState);
@@ -148,7 +162,7 @@ export function useAuth() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: getOAuthRedirectUrl(),
       },
     });
   }, []);
