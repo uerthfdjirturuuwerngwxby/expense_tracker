@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "./supabaseClient";
+import { API_BASE } from "./apiBase";
 
-// No API prefix - all requests go through the Vite proxy.
 export async function apiFetch(path, options = {}) {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,

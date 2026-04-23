@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
+import { API_BASE } from "./apiBase";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ export default function OAuthCallback() {
           return;
         }
 
-        const response = await fetch("/api/auth/google-session", {
+        const response = await fetch(`${API_BASE}/api/auth/google-session`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
