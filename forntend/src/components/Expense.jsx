@@ -124,79 +124,6 @@ const parseDateParts = (dateStr) => {
 const monthInputValue = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 
 const API = API_BASE;
-const TEST_EMAIL = 'samalanithin18@gmail.com';
-const TEST_DAILY_EXP_KEY = 'expenseai:test:dailyExpenses:v1';
-
-function generateOneYearDailyTestExpenses() {
-  const categories = [
-    'Food & Dining', 'Transportation', 'Entertainment', 'Shopping', 'Utilities',
-    'Housing', 'Healthcare', 'Education', 'Travel', 'Personal Care', 'Other'
-  ];
-  const categoryBase = {
-    'Food & Dining': 220,
-    'Transportation': 120,
-    'Entertainment': 110,
-    'Shopping': 180,
-    'Utilities': 150,
-    'Housing': 480,
-    'Healthcare': 90,
-    'Education': 130,
-    'Travel': 160,
-    'Personal Care': 95,
-    'Other': 70,
-  };
-  const now = new Date();
-  const rows = [];
-  let idCounter = 1;
-
-  for (let m = -11; m <= 0; m++) {
-    const monthDate = new Date(now.getFullYear(), now.getMonth() + m, 1);
-    const y = monthDate.getFullYear();
-    const mo = monthDate.getMonth();
-    const daysInMonth = new Date(y, mo + 1, 0).getDate();
-    const monthSeason = (mo === 4 || mo === 11) ? 1.2 : (mo === 9 || mo === 10 ? 1.1 : 1.0);
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const cat = categories[(d + mo) % categories.length];
-      const dayWave = 0.88 + (((d * 37 + mo * 17) % 23) / 100);
-      const amount = Math.round((categoryBase[cat] || 120) * monthSeason * dayWave);
-      const date = `${y}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      rows.push({
-        id: `test-exp-${idCounter++}`,
-        title: `${cat} expense`,
-        amount,
-        category: cat,
-        type: 'expense',
-        date,
-      });
-    }
-
-    rows.push({
-      id: `test-inc-${y}-${String(mo + 1).padStart(2, '0')}` ,
-      title: 'Income',
-      amount: 42000,
-      category: 'Income',
-      type: 'income',
-      date: `${y}-${String(mo + 1).padStart(2, '0')}-01`,
-    });
-  }
-
-  return rows;
-}
-
-function loadOrCreateDailyTestExpenses() {
-  try {
-    const raw = localStorage.getItem(TEST_DAILY_EXP_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 300) return parsed;
-    }
-  } catch {}
-  const generated = generateOneYearDailyTestExpenses();
-  localStorage.setItem(TEST_DAILY_EXP_KEY, JSON.stringify(generated));
-  return generated;
-}
-
 // -----------------------------------------------------------------------------
 //  TOP-LEVEL CHART COMPONENTS - defined outside Expense so they NEVER remount
 //  on parent state changes (tooltip hover, etc). Only re-render when their
@@ -407,8 +334,6 @@ export default function Expense({ user, onLogout }) {
   const [navHide,  setNavHide]  = useState(false);
   const lastScroll = useRef(0);
   const [activeIdx, setActiveIdx] = useState(1);
-  const isTestUser = (user?.email || '').toLowerCase() === TEST_EMAIL;
-
   const [expenses,    setExpenses]    = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [modalOpen,   setModalOpen]   = useState(false);
@@ -467,12 +392,6 @@ export default function Expense({ user, onLogout }) {
   useEffect(() => {
     (async () => {
       try {
-        if (isTestUser) {
-          const testRows = loadOrCreateDailyTestExpenses();
-          setExpenses(testRows.map(e => ({ ...e, type: e.type === 'income' || e.category === 'Income' ? 'income' : 'expense', amount: san(e.amount) })));
-          return;
-        }
-
         const res = await fetch(`${API}/api/expenses`, { credentials:'include' });
         if (!res.ok) { setLoading(false); return; }
         const data = await res.json();
@@ -486,7 +405,7 @@ export default function Expense({ user, onLogout }) {
       } catch(err) { console.warn('Failed to load expenses:', err); }
       finally { setLoading(false); }
     })();
-  }, [isTestUser]);
+  }, []);
 
   // -- Build chart data whenever expenses/range/chart changes --
   useEffect(() => {

@@ -68,10 +68,6 @@ const san = (n) => {
   return v > 0 && v < 1 ? Math.round(v * 1000 * 100) / 100 : v;
 };
 
-const TEST_EMAIL = "samalanithin18@gmail.com";
-const TEST_BUDGET = 15000;
-const TEST_MONTHLY_ROWS_KEY = "expenseai:test:monthlyRows:v1";
-const TEST_DAILY_EXP_KEY = "expenseai:test:dailyExpenses:v1";
 
 function normalizeExpenseEntry(entry) {
   return {
@@ -83,100 +79,6 @@ function normalizeExpenseEntry(entry) {
 
 function monthShift(baseDate, deltaMonths) {
   return new Date(baseDate.getFullYear(), baseDate.getMonth() + deltaMonths, 1);
-}
-
-function createTestMonthlyRows() {
-  const baseWeights = {
-    Food_Dining: 0.18, Transportation: 0.08, Entertainment: 0.06, Shopping: 0.10, Utilities: 0.08,
-    Housing: 0.28, Healthcare: 0.05, Education: 0.06, Travel: 0.05, Personal_Care: 0.04, Other: 0.02,
-  };
-  const keys = Object.keys(MODEL_TO_UI);
-  const rows = [];
-  const now = new Date();
-
-  for (let i = -11; i <= 0; i++) {
-    const d = monthShift(now, i);
-    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const seasonal = {
-      Travel: [4, 11].includes(d.getMonth()) ? 1.25 : 1,
-      Shopping: [9, 10].includes(d.getMonth()) ? 1.2 : 1,
-      Utilities: [3, 4, 5].includes(d.getMonth()) ? 1.18 : 1,
-      Education: d.getMonth() === 5 ? 1.2 : 1,
-    };
-
-    const drift = 1 + ((Math.sin((i + 12) * 1.7) + 1) * 0.04 - 0.04);
-    const monthTotal = Math.round(TEST_BUDGET * drift);
-    let row = { area: "Uppal", month, Income: 42000, Total_Expense: 0 };
-    let scoreSum = 0;
-    const scores = {};
-
-    keys.forEach((k) => {
-      const wave = 1 + ((Math.cos((i + 12) * (k.length % 5 + 1)) + 1) * 0.02 - 0.02);
-      const s = (baseWeights[k] || 0.02) * (seasonal[k] || 1) * wave;
-      scores[k] = s;
-      scoreSum += s;
-    });
-
-    keys.forEach((k) => {
-      row[k] = Math.max(120, Math.round((scores[k] / scoreSum) * monthTotal));
-      row.Total_Expense += row[k];
-    });
-    row.Income = Math.max(35000, row.Total_Expense + 15000);
-    rows.push(row);
-  }
-
-  return rows;
-}
-
-function loadOrCreateTestRows() {
-  try {
-    const raw = localStorage.getItem(TEST_MONTHLY_ROWS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length >= 12) return parsed;
-    }
-  } catch {}
-
-  const rows = createTestMonthlyRows();
-  localStorage.setItem(TEST_MONTHLY_ROWS_KEY, JSON.stringify(rows));
-  localStorage.setItem("expenseai:budget", JSON.stringify({ monthlyBudget: TEST_BUDGET }));
-  return rows;
-}
-
-function loadDailyTestExpenses() {
-  try {
-    const raw = localStorage.getItem(TEST_DAILY_EXP_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 300) return parsed;
-    }
-  } catch {}
-  return null;
-}
-
-function monthlyRowsToExpenses(rows) {
-  const expenses = [];
-  rows.forEach((r) => {
-    Object.keys(MODEL_TO_UI).forEach((k, idx) => {
-      expenses.push({
-        id: `${r.month}-${k}`,
-        title: MODEL_TO_UI[k],
-        amount: r[k],
-        category: MODEL_TO_UI[k],
-        type: "expense",
-        date: `${r.month}-${String((idx % 25) + 1).padStart(2, "0")}`,
-      });
-    });
-    expenses.push({
-      id: `${r.month}-income`,
-      title: "Income",
-      amount: r.Income || 0,
-      category: "Income",
-      type: "income",
-      date: `${r.month}-01`,
-    });
-  });
-  return expenses;
 }
 
 function parseDateParts(dateStr) {
@@ -700,7 +602,6 @@ export default function Analytics({ user, onLogout }) {
   const [customTargetMonth, setCustomTargetMonth] = useState(monthStartString(0));
 
   const [activeSection, setActiveSection] = useState("overview");
-  const isTestUser = (user?.email || "").toLowerCase() === TEST_EMAIL;
   const userArea = user?.area || user?.location || "Uppal";
 
   useEffect(() => {
@@ -715,42 +616,26 @@ export default function Analytics({ user, onLogout }) {
   }, []);
 
   useEffect(() => {
-    if (!isTestUser && userArea) {
+    if (userArea) {
       setArea(userArea);
     }
-  }, [isTestUser, userArea]);
+  }, [userArea]);
 
   // Load expenses
   useEffect(() => {
     (async () => {
       try {
-        if (isTestUser) {
-          const dailyRows = loadDailyTestExpenses();
-          if (dailyRows?.length) {
-            setExpenses(dailyRows.map(normalizeExpenseEntry));
-            return;
-          }
-        }
-
         const res = await fetch(`${APP_API}/api/expenses`, { credentials: "include" });
         if (res.ok) {
           const data = await res.json();
           const realExpenses = (data.expenses || []).map(normalizeExpenseEntry);
-          if (realExpenses.length > 0) {
-            setExpenses(realExpenses);
-            return;
-          }
-        }
-
-        if (isTestUser) {
-          const rows = loadOrCreateTestRows();
-          setArea(rows[rows.length - 1]?.area || "Uppal");
-          setExpenses(monthlyRowsToExpenses(rows).map(normalizeExpenseEntry));
+          setExpenses(realExpenses);
+          return;
         }
       } catch (e) { console.warn("expenses load failed", e); }
       finally { setExpLoading(false); }
     })();
-  }, [isTestUser]);
+  }, []);
 
   const allMonthlyRows = useMemo(() => buildMonthlyRowsFromExpenses(expenses, area), [expenses, area]);
   const predictionMonthOptions = useMemo(() => allMonthlyRows.map(r => r.month), [allMonthlyRows]);

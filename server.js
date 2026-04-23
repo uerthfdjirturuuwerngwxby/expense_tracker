@@ -53,17 +53,20 @@ app.get("/health", (_req, res) => {
 });
 
 const COOKIE_NAME    = "auth_token";
-const COOKIE_VISIBLE = "auth_token_info";
+const COOKIE_HINT    = "auth_logged_in";
 const COOKIE_BASE = {
   secure: isProduction,
   sameSite: isProduction ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
   path: "/",
 };
-const sendAuthCookie = (res,token) => { res.cookie(COOKIE_NAME,token,{...COOKIE_BASE,httpOnly:true}); res.cookie(COOKIE_VISIBLE,token,{...COOKIE_BASE,httpOnly:false}); };
+const sendAuthCookie = (res,token) => {
+  res.cookie(COOKIE_NAME, token, { ...COOKIE_BASE, httpOnly: true });
+  res.cookie(COOKIE_HINT, "true", { ...COOKIE_BASE, httpOnly: false });
+};
 const clearAuthCookie = (res) => {
   res.clearCookie(COOKIE_NAME, COOKIE_BASE);
-  res.clearCookie(COOKIE_VISIBLE, COOKIE_BASE);
+  res.clearCookie(COOKIE_HINT, COOKIE_BASE);
 };
 const signToken = (p) => jwt.sign(p, JWT_SECRET, { expiresIn:JWT_EXPIRES });
 const verifyToken = (t) => { try { return jwt.verify(t,JWT_SECRET); } catch { return null; } };

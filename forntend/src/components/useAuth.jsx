@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { useLocation } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { API_BASE } from "./apiBase";
+
+const AUTH_HINT_COOKIE = "auth_logged_in";
 
 export async function apiFetch(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -9,41 +10,64 @@ export async function apiFetch(path, options = {}) {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
     ...options,
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || "Request failed");
   return data;
 }
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/auth/callback"]);
 const listeners = new Set();
 let sharedAuthState = {
   user: null,
   loading: true,
 };
+let authBootstrapPromise = null;
+let authBootstrapped = false;
 
 function broadcastAuthState(next) {
   sharedAuthState = { ...sharedAuthState, ...next };
   for (const listener of listeners) listener(sharedAuthState);
 }
 
-function hasVisibleSessionCookie() {
+function hasAuthHintCookie() {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((part) => part.trim().startsWith("auth_token_info="));
+  return document.cookie.split("; ").some((entry) => entry.startsWith(`${AUTH_HINT_COOKIE}=`));
 }
 
-function clearVisibleSessionCookie() {
-  if (typeof document === "undefined") return;
-  document.cookie = "auth_token_info=; Max-Age=0; path=/";
-}
-
-async function syncUserFromServer() {
+export async function syncUserFromServer() {
   const data = await apiFetch("/api/me");
   broadcastAuthState({ user: data.user, loading: false });
   return data.user;
 }
 
+async function bootstrapAuth(force = false) {
+  if (!force && authBootstrapped) return sharedAuthState.user;
+  if (!force && authBootstrapPromise) return authBootstrapPromise;
+
+  if (!force && !hasAuthHintCookie()) {
+    authBootstrapped = true;
+    broadcastAuthState({ user: null, loading: false });
+    return null;
+  }
+
+  broadcastAuthState({ loading: true });
+  authBootstrapPromise = (async () => {
+    try {
+      const user = await syncUserFromServer();
+      authBootstrapped = true;
+      return user;
+    } catch {
+      authBootstrapped = true;
+      broadcastAuthState({ user: null, loading: false });
+      return null;
+    } finally {
+      authBootstrapPromise = null;
+    }
+  })();
+
+  return authBootstrapPromise;
+}
+
 export function useAuth() {
-  const location = useLocation();
   const [user, setUser] = useState(sharedAuthState.user);
   const [loading, setLoading] = useState(sharedAuthState.loading);
 
@@ -58,24 +82,8 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const isPublicPath = PUBLIC_PATHS.has(location.pathname);
-      if (isPublicPath && !hasVisibleSessionCookie()) {
-        broadcastAuthState({ user: null, loading: false });
-        return;
-      }
-
-      broadcastAuthState({ loading: true });
-      try {
-        await syncUserFromServer();
-      } catch {
-        clearVisibleSessionCookie();
-        broadcastAuthState({ user: null, loading: false });
-      }
-    };
-
-    checkAuth();
-  }, [location.pathname]);
+    bootstrapAuth();
+  }, []);
 
   const signup = useCallback(async ({ first_name, last_name, email, password }) => {
     broadcastAuthState({ loading: true });
@@ -83,12 +91,10 @@ export function useAuth() {
       method: "POST",
       body: JSON.stringify({ first_name, last_name, email, password }),
     });
-    try {
-      return await syncUserFromServer();
-    } catch {
-      broadcastAuthState({ user: data.user, loading: false });
-      return data.user;
-    }
+    const syncedUser = await bootstrapAuth(true);
+    if (syncedUser) return syncedUser;
+    broadcastAuthState({ user: data.user, loading: false });
+    return data.user;
   }, []);
 
   const login = useCallback(async ({ email, password }) => {
@@ -97,12 +103,10 @@ export function useAuth() {
       method: "POST",
       body: JSON.stringify({ email, password }),
     });
-    try {
-      return await syncUserFromServer();
-    } catch {
-      broadcastAuthState({ user: data.user, loading: false });
-      return data.user;
-    }
+    const syncedUser = await bootstrapAuth(true);
+    if (syncedUser) return syncedUser;
+    broadcastAuthState({ user: data.user, loading: false });
+    return data.user;
   }, []);
 
   const requestPasswordResetOtp = useCallback(async ({ email }) => {
@@ -134,14 +138,7 @@ export function useAuth() {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    broadcastAuthState({ loading: true });
-    try {
-      return await syncUserFromServer();
-    } catch {
-      clearVisibleSessionCookie();
-      broadcastAuthState({ user: null, loading: false });
-      return null;
-    }
+    return bootstrapAuth(true);
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
@@ -154,16 +151,11 @@ export function useAuth() {
   }, []);
 
   const logout = useCallback(async () => {
-    const email = (user?.email || "").toLowerCase();
-    if (email === "samalanithin18@gmail.com") {
-      localStorage.removeItem("expenseai:test:monthlyRows:v1");
-      localStorage.removeItem("expenseai:test:dailyExpenses:v1");
-      localStorage.removeItem("expenseai:budget");
-    }
     await apiFetch("/api/logout", { method: "POST" });
-    clearVisibleSessionCookie();
+    await supabase.auth.signOut().catch(() => {});
+    authBootstrapped = true;
     broadcastAuthState({ user: null, loading: false });
-  }, [user]);
+  }, []);
 
   return {
     user,

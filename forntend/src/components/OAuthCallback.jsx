@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./supabaseClient";
 import { API_BASE } from "./apiBase";
+import { syncUserFromServer } from "./useAuth";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -48,6 +49,7 @@ export default function OAuthCallback() {
           return;
         }
 
+        await syncUserFromServer();
         navigate("/expenses", { replace: true });
       } catch (err) {
         console.error("OAuth callback failed:", err);
