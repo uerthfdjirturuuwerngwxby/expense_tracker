@@ -39,6 +39,14 @@ app.use(cookieParser());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
 const upload = multer({ storage: multer.memoryStorage() });
 
+app.get("/", (_req, res) => {
+  res.status(200).json({ ok: true, service: "backend" });
+});
+
+app.get("/health", (_req, res) => {
+  res.status(200).json({ ok: true });
+});
+
 const COOKIE_NAME    = "auth_token";
 const COOKIE_VISIBLE = "auth_token_info";
 const COOKIE_BASE = {
