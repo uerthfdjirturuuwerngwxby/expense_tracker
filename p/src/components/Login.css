@@ -1,0 +1,226 @@
+/* ===== Page Layout ===== */
+.animated-background{
+  min-height:100vh;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  position:relative;
+  padding:40px 16px;
+  font-family:Inter, system-ui, Arial, sans-serif;
+}
+
+/* ===== Floating circles ===== */
+.floating-circles{position:fixed;inset:0;z-index:0;overflow:hidden}
+.circle{
+  position:absolute;border-radius:50%;
+  background:rgba(99,102,241,.08);
+  animation:float 28s infinite ease-in-out;
+}
+.circle:nth-child(1){width:320px;height:320px;top:-120px;left:-120px;}
+.circle:nth-child(2){width:420px;height:420px;bottom:-180px;right:-160px;}
+.circle:nth-child(3){width:220px;height:220px;top:25%;left:18%;}
+.circle:nth-child(4){width:260px;height:260px;bottom:12%;left:12%;}
+.circle:nth-child(5){width:180px;height:180px;top:60%;right:10%;}
+.circle:nth-child(6){width:350px;height:350px;top:42%;left:50%;}
+
+@keyframes float{
+0%{transform:translateY(0)}
+50%{transform:translateY(-40px)}
+100%{transform:translateY(0)}
+}
+
+/* ===== Glass Card ===== */
+.glass-card{
+  width:420px;
+  padding:42px 40px;
+  border-radius:22px;
+  backdrop-filter:blur(20px) saturate(160%);
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 30px 80px rgba(0,0,0,.12);
+  z-index:2;
+}
+
+/* ===== Headings ===== */
+.title{
+  text-align:center;
+  font-size:32px;
+  font-weight:700;
+  color:#1f2937;
+  margin-bottom:6px;
+}
+.title span{color:#5b5ce2}
+
+.subtitle{
+  text-align:center;
+  color:#6b7280;
+  margin-bottom:28px;
+  font-size:15px;
+}
+
+/* ===== Form ===== */
+.input-group{margin-bottom:22px}
+label{
+  font-size:14px;
+  font-weight:600;
+  color:#374151;
+  margin-bottom:6px;
+  display:block;
+}
+
+.input-wrapper{position:relative}
+
+/* Inputs */
+input{
+  width:100%;
+  height:48px;
+  padding:0 44px;
+  border-radius:12px;
+  border:1px solid #e5e7eb;
+  background:#f9fafb;
+  font-size:15px;
+  transition:.25s;
+}
+
+input:focus{
+  background:white;
+  border-color:#6366f1;
+  box-shadow:0 0 0 3px rgba(99,102,241,.15);
+  outline:none;
+}
+
+/* Icons */
+.icon-left{
+  position:absolute;
+  left:14px;
+  top:0;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#9ca3af;
+  pointer-events:none;
+}
+
+.icon-left svg{
+  width:18px;
+  height:18px;
+}
+
+/* Password toggle */
+.password-toggle{
+  position:absolute;
+  right:14px;
+  top:0;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  background:none;
+  color:#9ca3af;
+  cursor:pointer;
+}
+
+.password-toggle svg{
+  width:20px;
+  height:20px;
+}
+
+/* Checkbox */
+.checkbox-label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:14px;
+  color:#4b5563;
+  margin-bottom:22px;
+}
+.checkbox-label input{
+  width:16px;
+  height:16px;
+  accent-color:#6366f1;
+}
+
+/* Submit button */
+.submit{
+  width:100%;
+  height:48px;
+  border:none;
+  border-radius:999px;
+  font-weight:600;
+  font-size:15px;
+  color:white;
+  background:linear-gradient(135deg,#4f46e5,#7c3aed);
+  cursor:pointer;
+  transition:.25s;
+}
+.submit:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 30px rgba(79,70,229,.35);
+}
+.submit:disabled{opacity:.6;cursor:not-allowed}
+
+/* Divider */
+.divider{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin:24px 0;
+  color:#6b7280;
+  font-size:14px;
+}
+.divider::before,
+.divider::after{
+  content:"";
+  flex:1;
+  height:1px;
+  background:#e5e7eb;
+}
+
+/* Google Button */
+.google-btn{
+  width:100%;
+  height:48px;
+  border-radius:999px;
+  border:1px solid #e5e7eb;
+  background:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  font-weight:600;
+  font-size:15px;
+  cursor:pointer;
+  transition:.2s;
+}
+.google-btn:hover{
+  background:#f9fafb;
+  box-shadow:0 6px 14px rgba(0,0,0,.08);
+}
+.google-icon{width:20px}
+
+/* Footer link */
+.signup-link{
+  text-align:center;
+  margin-top:18px;
+  font-size:14px;
+  color:#4b5563;
+}
+.signup-link a{
+  color:#6d28d9;
+  font-weight:600;
+  text-decoration:none;
+}
+.signup-link a:hover{text-decoration:underline}
+
+/* Messages */
+.msg{
+  padding:10px;
+  border-radius:10px;
+  margin-bottom:18px;
+  font-size:14px;
+  text-align:center;
+}
+.success{background:#dcfce7;color:#166534}
+.error{background:#fee2e2;color:#991b1b}
