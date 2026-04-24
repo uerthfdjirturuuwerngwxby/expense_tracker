@@ -5,7 +5,7 @@ import { API_BASE } from "./apiBase";
 // ─── Constants ───────────────────────────────────────────────────────────────
 const APP_API = API_BASE;
 const PREDICTION_API =
-  import.meta.env.VITE_PREDICTION_API || "http://localhost:5000";
+  import.meta.env.VITE_PREDICTION_API || "/ml-api";
 
 
 const NAV_LINKS = [

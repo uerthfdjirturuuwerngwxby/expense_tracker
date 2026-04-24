@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/ml-api/(.*)",
+      "destination": "https://expense-tracker-ml-52jo.onrender.com/api/$1"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "https://expense-tracker-backend-jtxw.onrender.com/api/$1"
     },

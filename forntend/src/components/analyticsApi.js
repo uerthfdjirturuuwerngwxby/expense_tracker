@@ -16,5 +16,5 @@ export async function fetchExportExpenses(months = 6) {
 }
 
 export async function fetchPredictionAnalytics() {
-  return analyticsApiFetch("/api/analytics/prediction");
+  return analyticsApiFetch("/ml-api/analytics/prediction");
 }
