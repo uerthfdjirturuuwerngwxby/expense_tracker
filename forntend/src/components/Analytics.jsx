@@ -699,7 +699,7 @@ export default function Analytics({ user, onLogout }) {
       const query = new URLSearchParams({ area });
       if (predictionBaseMonth !== "ALL") query.set("base_month", predictionBaseMonth);
       query.set("predict_for_month", targetPredictionMonth);
-      const res = await fetch(`${PREDICTION_API}/api/analytics/prediction?${query.toString()}`, {
+      const res = await fetch(`${PREDICTION_API}/analytics/prediction?${query.toString()}`, {
         credentials: "include",
       });
       const json = await res.json();
