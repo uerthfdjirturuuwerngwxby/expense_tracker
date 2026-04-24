@@ -695,20 +695,6 @@ export default function Analytics({ user, onLogout }) {
     setPredData(null);
     setForecastData(null);
     try {
-      if (isTestUser) {
-        const localPayload = buildLocalPredictionPayload({
-          area,
-          monthlyRows: allMonthlyRows,
-          monthlyTarget,
-          selectedMonth: predictionBaseMonth,
-          targetMonth: targetPredictionMonth,
-        });
-        if (!localPayload) throw new Error("Not enough local data for prediction.");
-        setPredData(localPayload);
-        setForecastData(localPayload);
-        return;
-      }
-
       const query = new URLSearchParams({ area });
       if (predictionBaseMonth !== "ALL") query.set("base_month", predictionBaseMonth);
       query.set("predict_for_month", targetPredictionMonth);
@@ -720,21 +706,6 @@ export default function Analytics({ user, onLogout }) {
       setPredData(json);
       setForecastData(json);
     } catch (e) {
-      if (isTestUser) {
-        const localPayload = buildLocalPredictionPayload({
-          area,
-          monthlyRows: allMonthlyRows,
-          monthlyTarget,
-          selectedMonth: predictionBaseMonth,
-          targetMonth: targetPredictionMonth,
-        });
-        if (localPayload) {
-          setPredData(localPayload);
-          setForecastData(localPayload);
-          setPredError("Using local prediction based on available previous months.");
-          return;
-        }
-      }
       setPredError(e?.message || "Could not fetch prediction from trained model service.");
     } finally {
       setPredLoading(false);
